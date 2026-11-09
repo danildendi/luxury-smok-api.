@@ -1,13 +1,14 @@
+
 import os
 import json
 import secrets
 import hashlib
-import smtplib
 import statistics
 import time
+import urllib.request
+import urllib.error
 
 from datetime import datetime, timedelta, timezone
-from email.message import EmailMessage
 from typing import Optional
 
 import firebase_admin
@@ -107,27 +108,52 @@ def find_user(identifier):
 
 
 # ==============================
-# CORREO ELECTRÓNICO
+# CORREO ELECTRÓNICO - BREVO
 # ==============================
 
 def send_email(to_email: str, subject: str, body: str):
 
-    host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    port = int(os.getenv("SMTP_PORT", "587"))
+    api_key = os.environ.get("BREVO_API_KEY")
+    sender_email = os.environ.get("BREVO_SENDER_EMAIL")
 
-    sender = os.environ["SMTP_USER"]
-    password = os.environ["SMTP_APP_PASSWORD"]
+    if not api_key:
+        raise RuntimeError("Falta configurar BREVO_API_KEY en Render")
 
-    msg = EmailMessage()
-    msg["Subject"] = subject
-    msg["From"] = os.getenv("SMTP_FROM", sender)
-    msg["To"] = to_email
-    msg.set_content(body)
+    if not sender_email:
+        raise RuntimeError("Falta configurar BREVO_SENDER_EMAIL en Render")
 
-    with smtplib.SMTP(host, port, timeout=20) as server:
-        server.starttls()
-        server.login(sender, password)
-        server.send_message(msg)
+    payload = {
+        "sender": {
+            "name": "Luxury Smok",
+            "email": sender_email
+        },
+        "to": [
+            {"email": to_email}
+        ],
+        "subject": subject,
+        "textContent": body
+    }
+
+    request = urllib.request.Request(
+        "https://api.brevo.com/v3/smtp/email",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "api-key": api_key,
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        },
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return response.read().decode("utf-8")
+
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"Error de Brevo ({error.code}): {detail}"
+        ) from error
 
 
 # ==============================
@@ -289,7 +315,6 @@ def request_reset(data: ResetRequest):
 
     user_key, user = find_user(data.username)
 
-    # Respuesta genérica para no revelar si existe la cuenta.
     if user and user.get("active") and user.get("email"):
 
         code = f"{secrets.randbelow(1000000):06d}"

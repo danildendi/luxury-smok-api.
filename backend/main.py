@@ -37,10 +37,12 @@ def init_firebase():
 init_firebase()
 app = FastAPI(title=APP_NAME, version="1.0.0")
 
-# ============ CONFIGURACIÓN CORS CORREGIDA ============
+# ============ CONFIGURACIÓN CORS OFICIAL Y SEGURA ============
+# Permitimos explícitamente tu página de GitHub Pages.
+# Usamos allow_credentials=True porque tu app usa Tokens (JWT) en las cabeceras.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://danildendi.github.io"],
+    allow_origins=["https://danildendi.github.io"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

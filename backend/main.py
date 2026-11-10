@@ -1,4 +1,3 @@
-
 import os
 import json
 import secrets
@@ -481,10 +480,11 @@ def ai_chat(
         ]
     }
 
-    client = OpenAI(api_key=key)
+    # ============ CAMBIO APLICADO: CONEXIÓN A GROQ ============
+    client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=key)
 
     response = client.chat.completions.create(
-        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        model=os.getenv("OPENAI_MODEL", "llama-3.3-70b-versatile"),
 
         messages=[
             {

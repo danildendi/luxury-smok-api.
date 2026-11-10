@@ -2,9 +2,11 @@ import os
 import json
 import secrets
 import hashlib
+import time
 import urllib.request
 import urllib.error
-import time
+import smtplib
+from email.message import EmailMessage
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -38,7 +40,6 @@ def init_firebase():
 init_firebase()
 app = FastAPI(title=APP_NAME, version="1.0.0")
 
-# ============ CONFIGURACIÓN CORS OFICIAL Y SEGURA ============
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://danildendi.github.io"], 
@@ -59,17 +60,18 @@ def find_user(identifier):
             return key, user
     return None, None
 
+# ============ ENVÍO DE CORREO CON GMAIL ============
 def send_email(to_email: str, subject: str, body: str):
-    api_key = os.environ.get("BREVO_API_KEY")
-    sender_email = os.environ.get("BREVO_SENDER_EMAIL")
-    payload = {
-        "sender": {"name": "Luxury Smok", "email": sender_email},
-        "to": [{"email": to_email}],
-        "subject": subject,
-        "textContent": body
-    }
-    req = urllib.request.Request("https://api.brevo.com/v3/smtp/email", data=json.dumps(payload).encode("utf-8"), headers={"api-key": api_key, "Content-Type": "application/json"}, method="POST")
-    with urllib.request.urlopen(req, timeout=30) as response: return response.read().decode("utf-8")
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = os.environ.get("SMTP_FROM")
+    msg["To"] = to_email
+    msg.set_content(body)
+    
+    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        server.starttls()
+        server.login(os.environ.get("SMTP_USER"), os.environ.get("SMTP_APP_PASSWORD"))
+        server.send_message(msg)
 
 def seed_user(username, role, initial_password, email):
     if not initial_password or not email: return

@@ -66,9 +66,9 @@ origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins or [],
-    allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -480,7 +480,7 @@ def ai_chat(
         ]
     }
 
-    # ============ CAMBIO APLICADO: CONEXIÓN A GROQ ============
+    # ============ CONEXIÓN A GROQ ============
     client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=key)
 
     response = client.chat.completions.create(

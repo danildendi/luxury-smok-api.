@@ -18,7 +18,6 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from passlib.context import CryptContext
 from jose import jwt, JWTError
-from openai import OpenAI
 
 APP_NAME = "Luxury Smok API"
 JWT_SECRET = os.environ["JWT_SECRET"]
@@ -38,6 +37,7 @@ def init_firebase():
 init_firebase()
 app = FastAPI(title=APP_NAME, version="1.0.0")
 
+# CORS para permitir tu página
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://danildendi.github.io"], 
@@ -58,14 +58,11 @@ def find_user(identifier):
             return key, user
     return None, None
 
-# ============ ENVÍO DE CORREO CON BREVO ============
+# ============ ENVÍO DE CORREO CON BREVO (API HTTP) ============
 def send_email(to_email: str, subject: str, body: str):
     api_key = os.environ.get("BREVO_API_KEY")
     sender_email = os.environ.get("BREVO_SENDER_EMAIL")
     
-    if not api_key or not sender_email:
-        raise RuntimeError("Falta BREVO_API_KEY o BREVO_SENDER_EMAIL")
-
     payload = {
         "sender": {"name": "Luxury Smok", "email": sender_email},
         "to": [{"email": to_email}],
@@ -76,11 +73,7 @@ def send_email(to_email: str, subject: str, body: str):
     req = urllib.request.Request(
         "https://api.brevo.com/v3/smtp/email",
         data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "api-key": api_key,
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-        },
+        headers={"api-key": api_key, "Content-Type": "application/json"},
         method="POST"
     )
 
@@ -114,9 +107,6 @@ class ResetConfirm(BaseModel):
     code: str = Field(min_length=6, max_length=6)
     new_password: str = Field(min_length=8, max_length=128)
 
-class ChatIn(BaseModel):
-    message: str = Field(min_length=1, max_length=1500)
-
 def get_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer)):
     if not credentials: raise HTTPException(401, "Sesión requerida")
     try:
@@ -146,7 +136,7 @@ def request_reset(data: ResetRequest):
         salt = secrets.token_hex(16)
         digest = hashlib.sha256((salt + code).encode()).hexdigest()
         otp_ref().child(user_key).set({"salt": salt, "code_hash": digest, "expires_at": int(time.time()) + 600, "attempts": 0})
-        send_email(user["email"], "Código de recuperación - Luxury Smok", f"Tu código OTP es: <b>{code}</b>")
+        send_email(user["email"], "Código - Luxury Smok", f"Tu código OTP es: <b>{code}</b>")
     return {"message": "Si la cuenta existe, enviaremos un código."}
 
 @app.post("/auth/password-reset/confirm")
@@ -161,24 +151,3 @@ def confirm_reset(data: ResetConfirm):
     users_ref().child(user_key).update({"password_hash": pwd.hash(data.new_password)})
     ref.delete()
     return {"message": "Contraseña actualizada"}
-
-@app.post("/ai/chat")
-def ai_chat(data: ChatIn, user=Depends(get_user)):
-    key = os.environ.get("OPENAI_API_KEY")
-    if not key: raise HTTPException(503, "Falta API KEY")
-    
-    stock = db.reference("luxurysmok").get() or {}
-    inv = stock.get("inv", [])
-    
-    context = {"inventory": [{"name": p.get("n"), "stock": p.get("st")} for p in inv]}
-    
-    client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=key)
-    response = client.chat.completions.create(
-        model=os.getenv("OPENAI_MODEL", "llama-3.3-70b-versatile"),
-        messages=[
-            {"role": "system", "content": "Eres el asistente de Luxury Smok. Responde breve en español basándote en los datos JSON."},
-            {"role": "user", "content": f"Datos: {json.dumps(context)}\n\nPregunta: {data.message}"}
-        ],
-        temperature=0.2
-    )
-    return {"answer": response.choices[0].message.content}

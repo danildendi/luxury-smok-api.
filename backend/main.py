@@ -2,11 +2,9 @@ import os
 import json
 import secrets
 import hashlib
-import time
 import urllib.request
 import urllib.error
-import smtplib
-from email.message import EmailMessage
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -60,18 +58,38 @@ def find_user(identifier):
             return key, user
     return None, None
 
-# ============ ENVÍO DE CORREO CON GMAIL ============
+# ============ ENVÍO DE CORREO CON BREVO ============
 def send_email(to_email: str, subject: str, body: str):
-    msg = EmailMessage()
-    msg["Subject"] = subject
-    msg["From"] = os.environ.get("SMTP_FROM")
-    msg["To"] = to_email
-    msg.set_content(body)
+    api_key = os.environ.get("BREVO_API_KEY")
+    sender_email = os.environ.get("BREVO_SENDER_EMAIL")
     
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
-        server.starttls()
-        server.login(os.environ.get("SMTP_USER"), os.environ.get("SMTP_APP_PASSWORD"))
-        server.send_message(msg)
+    if not api_key or not sender_email:
+        raise RuntimeError("Falta BREVO_API_KEY o BREVO_SENDER_EMAIL")
+
+    payload = {
+        "sender": {"name": "Luxury Smok", "email": sender_email},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": f"<p>{body}</p>"
+    }
+
+    req = urllib.request.Request(
+        "https://api.brevo.com/v3/smtp/email",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "api-key": api_key,
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        },
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            return response.read().decode("utf-8")
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Error de Brevo ({error.code}): {detail}")
 
 def seed_user(username, role, initial_password, email):
     if not initial_password or not email: return
@@ -128,7 +146,7 @@ def request_reset(data: ResetRequest):
         salt = secrets.token_hex(16)
         digest = hashlib.sha256((salt + code).encode()).hexdigest()
         otp_ref().child(user_key).set({"salt": salt, "code_hash": digest, "expires_at": int(time.time()) + 600, "attempts": 0})
-        send_email(user["email"], "Código - Luxury Smok", f"Tu código OTP es: {code}")
+        send_email(user["email"], "Código de recuperación - Luxury Smok", f"Tu código OTP es: <b>{code}</b>")
     return {"message": "Si la cuenta existe, enviaremos un código."}
 
 @app.post("/auth/password-reset/confirm")

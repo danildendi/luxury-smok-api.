@@ -57,19 +57,15 @@ init_firebase()
 
 app = FastAPI(title=APP_NAME, version="1.0.0")
 
-origins = [
-    x.strip()
-    for x in os.getenv("CORS_ORIGINS", "").split(",")
-    if x.strip()
-]
-
+# ============ CORRECCIÓN DE CORS ============
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins or [],
+    allow_origins=["https://danildendi.github.io"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# ===========================================
 
 
 def users_ref():

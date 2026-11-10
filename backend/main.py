@@ -37,11 +37,11 @@ def init_firebase():
 init_firebase()
 app = FastAPI(title=APP_NAME, version="1.0.0")
 
-# ============ CONFIGURACIÓN CORS PERMISIVA ============
+# ============ CONFIGURACIÓN CORS CORREGIDA ============
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
-    allow_credentials=False,
+    allow_origins=["https://danildendi.github.io"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -143,7 +143,7 @@ def confirm_reset(data: ResetConfirm):
 
 @app.post("/ai/chat")
 def ai_chat(data: ChatIn, user=Depends(get_user)):
-    key = os.getenv("OPENAI_API_KEY")
+    key = os.environ.get("OPENAI_API_KEY")
     if not key: raise HTTPException(503, "Falta API KEY")
     
     stock = db.reference("luxurysmok").get() or {}

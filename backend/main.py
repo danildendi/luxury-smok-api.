@@ -4,6 +4,7 @@ import secrets
 import hashlib
 import urllib.request
 import urllib.error
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -38,8 +39,6 @@ init_firebase()
 app = FastAPI(title=APP_NAME, version="1.0.0")
 
 # ============ CONFIGURACIÓN CORS OFICIAL Y SEGURA ============
-# Permitimos explícitamente tu página de GitHub Pages.
-# Usamos allow_credentials=True porque tu app usa Tokens (JWT) en las cabeceras.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://danildendi.github.io"], 
